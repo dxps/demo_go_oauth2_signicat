@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,8 @@ import (
 	"strings"
 )
 
-const clientID = "dev-orange-sponge-701" // Your client ID
-const clientSecret = "futi...THwB"       // Your client Secret.
+const clientID = "dev-orange-sponge-701"                                // Your client ID
+const clientSecret = "futiYv5jxPnqkt74KDdGJp2xbDSCwNyJ5mCYfg5hKtuITHwB" // Your client Secret.
 
 func main() {
 
@@ -37,7 +38,7 @@ func handleOIDCRedirect() {
 
 		err := r.ParseForm()
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Could not parse URL query params: %v", err)
+			fmt.Fprintf(os.Stdout, "Could not parse URL query params: %v\n", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -58,7 +59,7 @@ func handleOIDCRedirect() {
 		reqURL := "https://demo-signicat-oidc-go.sandbox.signicat.dev/auth/open/connect/token"
 		req, err := http.NewRequest(http.MethodPost, reqURL, bodyReader)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Could not create HTTP request: %v", err)
+			fmt.Fprintf(os.Stdout, "Could not create HTTP request: %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -70,7 +71,7 @@ func handleOIDCRedirect() {
 		httpClient := http.Client{}
 		resp, err := httpClient.Do(req)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "Could not send HTTP request: %v", err)
+			fmt.Fprintf(os.Stdout, "Could not send HTTP request to get the tokens: %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -79,11 +80,13 @@ func handleOIDCRedirect() {
 		if resp.StatusCode != 200 {
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				fmt.Fprintf(os.Stdout, "Failed to get the body of the unsuccessful token response: %v", err)
+				fmt.Fprintf(os.Stdout, "Failed to get the body of the unsuccessful token response: %v\n", err)
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Fprintf(os.Stdout, "The unsuccessful token response body: %v\n", string(body))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "Got unsuccessful response: %v", string(bodyBytes))
+			fmt.Fprintf(os.Stdout, "Got unsuccessful token response code: %v body: %v\n", resp.StatusCode, string(bodyBytes))
 			return
 		}
 
@@ -93,17 +96,17 @@ func handleOIDCRedirect() {
 
 		var tr TokenResponse
 		if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
-			fmt.Fprintf(os.Stdout, "Could not parse JSON based token response: %v", err)
+			fmt.Fprintf(os.Stdout, "Could not parse JSON based token response: %v\n", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		fmt.Fprintf(os.Stdout, "[dbg] Got token response: %+v\n", tr)
-		fmt.Fprintf(os.Stdout, "[dbg] Got token response body: %v\n", resp.Body)
 
 		// -------------------------------------------------------------------
 		// Finally, send a response to redirect the user to the "welcome" page
 		// with the access token.
 		// -------------------------------------------------------------------
+
 		w.Header().Set("Location", "/welcome.html?access_token="+tr.AccessToken)
 		w.WriteHeader(http.StatusFound)
 	})
@@ -112,8 +115,90 @@ func handleOIDCRedirect() {
 func handleUserInfo() {
 
 	http.HandleFunc("/users/me", func(w http.ResponseWriter, r *http.Request) {
-		// TODO
+
+		token, err := getBearerAuthHeader(r.Header.Get("Authorization"))
+		if err != nil {
+			msg := fmt.Sprintf("Failed to get bearer token from request: %v\n", err)
+			fmt.Fprintln(os.Stdout, msg)
+			bs, _ := json.Marshal(MyUserInfoErrorResponse{Error: msg})
+			_, _ = w.Write(bs)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintf(os.Stdout, "[dbg] On '/users/me' got token: %v\n", *token)
+
+		reqURL := "https://demo-signicat-oidc-go.sandbox.signicat.dev/auth/open/connect/userinfo"
+		req, err := http.NewRequest(http.MethodPost, reqURL, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "Could not create HTTP request: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Add("Authorization", "Bearer "+*token)
+		// Perform the request.
+		httpClient := http.Client{}
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "Could not send HTTP request to userinfo: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Fprintf(os.Stdout, "Failed to get the body of the unsuccessful token response: %v\n", err)
+				fmt.Fprintf(os.Stdout, "The unsuccessful token response body: %v\n", resp.Body)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			fmt.Fprintf(os.Stdout, "Got unsuccessful userinfo response code: %v body: %v\n", resp.StatusCode, string(bodyBytes))
+			return
+		}
+
+		// --------------------------------------------------------
+		// Parse the response body into the `UserInfoResponse` struct.
+		// --------------------------------------------------------
+
+		var uir UserInfoResponse
+		if err := json.NewDecoder(resp.Body).Decode(&uir); err != nil {
+			fmt.Fprintf(os.Stdout, "Could not parse JSON based userinfo response: %v\n", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		uirBytes, err := json.Marshal(uir)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "Failed to marshal the userinfo response: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(uirBytes)
+		w.WriteHeader(http.StatusOK)
 	})
+}
+
+// getBearerAuthHeader validates incoming "Authorization header
+// and returns the token, otherwise an empty string.
+func getBearerAuthHeader(authHeader string) (*string, error) {
+
+	if authHeader == "" {
+		return nil, errors.New("The header value is empty")
+	}
+
+	parts := strings.Split(authHeader, "Bearer")
+	if len(parts) != 2 {
+		return nil, errors.New("The header value does not starts with Bearer")
+	}
+
+	token := strings.TrimSpace(parts[1])
+	if len(token) < 1 {
+		return nil, errors.New("The header value does not include anything besides the Bearer")
+	}
+
+	return &token, nil
 }
 
 type TokenResponse struct {
@@ -121,4 +206,15 @@ type TokenResponse struct {
 	RefreshToken         string `json:"refresh_token"`
 	IdToken              string `json:"id_token"`
 	AccessTokenExpiresIn int    `json:"expires_in"`
+}
+
+type UserInfoResponse struct {
+	Subject   string `json:"sub"`
+	GivenName string `json:"given_name"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+}
+
+type MyUserInfoErrorResponse struct {
+	Error string `json:"error"`
 }

@@ -4,33 +4,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Hello</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>SigniDemo OIDC Go :: Welcome</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/images/favicon/site.webmanifest">
 </head>
 
 <body>
 
 </body>
+
 <script>
-    // We can get the token from the "access_token" query
-    // param, available in the browsers "location" global
+    // We can get the token from the "access_token" query param,
+    // available in the browsers "location" global object.
     const query = window.location.search.substring(1)
     const token = query.split('access_token=')[1]
 
     // Call the user info API using the fetch browser library.
     fetch('/users/me', {
         headers: {
-            // Include the token in the Authorization header
-            Authorization: 'token ' + token
+            Authorization: 'Bearer ' + token
         }
     })
-        // Parse the response as JSON
-        .then(res => res.json())
-        .then(res => {
-            // Once we get the response (which has many fields)
-            // Documented here: https://developer.github.com/v3/users/#get-the-authenticated-user
+        // Parse the response as JSON.
+        .then(resp => resp.json())
+        .then(resp => {
             // Write "Welcome <user name>" to the documents body
-            const nameNode = document.createTextNode(`Welcome, ${res.name}`)
+            const nameNode = document.createTextNode(`Welcome, ${resp.sub}`)
             document.body.appendChild(nameNode)
         })
 </script>
