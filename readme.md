@@ -1,10 +1,14 @@
 ## Demo of Signicat OIDC using Go
 
+This is a minimal demo showcasing how to integrate a Go based project with Signicat's OpenID Connect (OIDC) feature set, part of the Authentication product.
+
+For further details regarding Signicat OpenID Connect, checkout [this starting reference](https://developer.signicat.com/docs/authentication/oidc.html#introduction-to-openid-connect).
+
 <br/>
 
 ### Signicat Setup
 
-In the [Dashboard](https://dashboard.signicat.dev), go to _OIDC clients_ and create a client with:
+In Signicat [Dashboard](https://dashboard.signicat.dev), go to _OIDC clients_ and create a client with:
 
 -   Client name: `demo_client_1`
 -   Primary Grant Type: `AuthorizationCode`
@@ -16,7 +20,7 @@ The generated client secret is `futiYv5jxPnqkt74KDdGJp2xbDSCwNyJ5mCYfg5hKtuITHwB
 
 Also, the generated client ID in this case is `dev-orange-sponge-701`.
 
-This also requires having a domain, so go to _Domain management_ and create one.
+This also requires having a domain, so go to _Domain management_ and create one.<br/>
 In this case, the FQDN is `demo-signicat-oidc-go.sandbox.signicat.dev`.
 
 <br/>
@@ -41,4 +45,4 @@ For further details on this topic, checkout [this](https://github.com/denji/gola
 
 ### The Flow
 
-`https://demo-signicat-oidc-go.sandbox.signicat.dev/auth/open/connect/authorize?client_id=dev-orange-sponge-701&redirect_uri=https://localhost:8087/oidc/redirect&response_type=code&scope=openid%20profile&state=123&code_challenge=ABC123&code_challenge_method=S256&response_mode=query`
+TODO

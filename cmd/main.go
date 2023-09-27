@@ -13,7 +13,7 @@ import (
 )
 
 const clientID = "dev-orange-sponge-701"                                // Your client ID
-const clientSecret = "futiYv5jxPnqkt74KDdGJp2xbDSCwNyJ5mCYfg5hKtuITHwB" // Your client Secret.
+const clientSecret = "yn3tG1oUA21a0Sko7zihafMS1ldSo564MAHyi3LLIAX3STSa" // Your client Secret.
 
 func main() {
 
